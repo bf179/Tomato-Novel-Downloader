@@ -373,7 +373,22 @@ fn cleanup_preview_cover_dir(
     book_id: &str,
     book_name: &str,
 ) {
-    let dir = book_folder_path(cfg, book_id, Some(book_name));
+    // let dir = book_folder_path(cfg, book_id, Some(book_name));
+    // 检查两种文件夹命名格式
+    let paths_to_check = vec![
+        // 正常路径：book_id_book_name
+        book_folder_path(cfg, book_id, Some(book_name)),
+        // 不正常路径：book_id_book_id (book_name 为 None 时产生)
+        book_folder_path(cfg, book_id, None),
+    ];
+
+    let safe_name = safe_fs_name(book_name, "_", 120);
+    for dir in paths_to_check {
+        cleanup_single_dir(&dir, &safe_name);
+    }
+}
+
+fn cleanup_single_dir(dir: &PathBuf, safe_name: &str) {
     if !dir.exists() {
         return;
     }
@@ -382,17 +397,16 @@ fn cleanup_preview_cover_dir(
         return;
     }
 
-    let Ok(read_dir) = std::fs::read_dir(&dir) else {
+    let Ok(read_dir) = std::fs::read_dir(dir) else {
         return;
     };
 
-    let safe_name = safe_fs_name(book_name, "_", 120);
     let mut entries: Vec<PathBuf> = Vec::new();
     for ent in read_dir.flatten() {
         entries.push(ent.path());
     }
     if entries.is_empty() {
-        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_dir_all(dir);
         info!(path = %dir.display(), "cleanup: 删除空的预览文件夹");
         return;
     }
@@ -428,8 +442,8 @@ fn cleanup_preview_cover_dir(
         let _ = std::fs::remove_file(p);
     }
 
-    if is_empty_dir(&dir).unwrap_or(false) {
-        let _ = std::fs::remove_dir_all(&dir);
+    if is_empty_dir(dir).unwrap_or(false) {
+        let _ = std::fs::remove_dir_all(dir);
         info!(path = %dir.display(), "cleanup: 已清理预览产生的封面文件夹");
     }
 }
